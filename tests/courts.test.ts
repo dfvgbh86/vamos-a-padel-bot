@@ -89,6 +89,41 @@ describe('buildHolidaySet', () => {
   });
 });
 
+describe('official Valencia holidays (Decreto 100/2025 for 2026, Decreto 42/2026 for 2027)', () => {
+  const has = (day: string) => holidays.has(date(day));
+
+  it('contains the 2026 autonomic list plus the two local holidays of the city of Valencia', () => {
+    for (const day of [
+      '2026-01-01', '2026-01-06', '2026-03-19', '2026-04-03', '2026-04-06', '2026-05-01', '2026-06-24',
+      '2026-08-15', '2026-10-09', '2026-10-12', '2026-12-08', '2026-12-25', '2026-01-22', '2026-04-13',
+    ]) {
+      expect(has(day), day).toBe(true);
+    }
+  });
+
+  it('contains the 2027 list: San Juan is gone, Todos los Santos and Constitución are in', () => {
+    for (const day of [
+      '2027-01-01', '2027-01-06', '2027-03-19', '2027-03-26', '2027-03-29', '2027-05-01',
+      '2027-10-09', '2027-10-12', '2027-11-01', '2027-12-06', '2027-12-08', '2027-12-25',
+    ]) {
+      expect(has(day), day).toBe(true);
+    }
+    expect(has('2027-06-24')).toBe(false);
+  });
+
+  it('does not invent holidays: 2026 Todos los Santos / Constitución fall on Sundays and are not moved', () => {
+    expect(has('2026-11-01')).toBe(false);
+    expect(has('2026-12-06')).toBe(false);
+    expect(has('2026-12-07')).toBe(false);
+  });
+
+  it('unlocks academy courts on a real upcoming weekday holiday and keeps the day around it closed', () => {
+    expect(allowedCourtIds(date('2026-12-08'), holidays)).toHaveLength(10); // Tuesday, Inmaculada
+    expect(allowedCourtIds(date('2026-12-09'), holidays)).toEqual([4, 9, 10, 11, 12]);
+    expect(allowedCourtIds(date('2027-03-26'), holidays)).toHaveLength(10); // Good Friday
+  });
+});
+
 describe('holidaysWithin', () => {
   it('lists holidays in the window, sorted, end exclusive', () => {
     const custom = buildHolidaySet('2026-11-20,2026-12-01');

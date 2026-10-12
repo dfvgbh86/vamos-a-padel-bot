@@ -1,10 +1,11 @@
 import { assertCourtAllowed } from '../config/courts.js';
-import type { GameDate } from '../config/gameDate.js';
+import { parseGameDate, type GameDate } from '../config/gameDate.js';
 
 /** Shared "Invitado" account used for every guest participant. */
 export const GUEST_ACCOUNT_ID = 3;
 export const MIN_DURATION_MINUTES = 60;
 export const MAX_DURATION_MINUTES = 180;
+export const DEFAULT_DURATION_MINUTES = 90;
 export const DEFAULT_GUEST_COUNT = 3;
 
 export type PaymentMode = 'wallet' | 'card';
@@ -36,35 +37,51 @@ const formatClock = (minutes: number): string => {
  * The only place that builds the `op=add_event` request body (field order mirrors the site's own form POST,
  * captured from a real booking on 2026-10-12). The academy-court guard runs here, on the very values
  * that are serialised, so a booking for a forbidden court cannot be produced by any caller.
+ *
+ * Every request field is read exactly once into a local constant: the guard and the wire format can
+ * never see different values (getters, proxies), and the date is re-validated instead of trusting its brand.
  */
 export const buildAddEventBody = (request: AddEventRequest): string => {
+  const hash = request.hash;
+  const accountId = request.accountId;
+  const courtId = request.courtId;
+  const startMinutes = request.startMinutes;
+  const durationMinutes = request.durationMinutes;
   const guestCount = request.guestCount ?? DEFAULT_GUEST_COUNT;
+  const payment: unknown = request.payment;
+  const holidays = request.holidays;
+  const gameDate = parseGameDate(request.gameDate);
 
-  assertCourtAllowed(request.courtId, request.gameDate, request.holidays);
+  assertCourtAllowed(courtId, gameDate, holidays);
 
-  if (!HASH_PATTERN.test(request.hash)) throw new Error('Booking hash must be 40 lowercase hex characters');
-  if (!Number.isInteger(request.accountId) || request.accountId <= 0 || request.accountId === GUEST_ACCOUNT_ID) {
-    throw new Error(`Invalid account id: ${request.accountId}`);
+  if (typeof hash !== 'string' || !HASH_PATTERN.test(hash)) {
+    throw new Error('Booking hash must be 40 lowercase hex characters');
   }
-  if (!Number.isInteger(request.startMinutes) || request.startMinutes < 0 || request.startMinutes >= 24 * 60) {
-    throw new Error(`Invalid start time (minutes from midnight): ${request.startMinutes}`);
+  if (!Number.isSafeInteger(accountId) || accountId <= 0 || accountId === GUEST_ACCOUNT_ID) {
+    throw new Error(`Invalid account id: ${String(accountId)}`);
+  }
+  if (!Number.isInteger(startMinutes) || startMinutes < 0 || startMinutes >= 24 * 60) {
+    throw new Error(`Invalid start time (minutes from midnight): ${String(startMinutes)}`);
   }
   if (
-    !Number.isInteger(request.durationMinutes) ||
-    request.durationMinutes < MIN_DURATION_MINUTES ||
-    request.durationMinutes > MAX_DURATION_MINUTES
+    !Number.isInteger(durationMinutes) ||
+    durationMinutes < MIN_DURATION_MINUTES ||
+    durationMinutes > MAX_DURATION_MINUTES
   ) {
-    throw new Error(`Invalid duration: ${request.durationMinutes} min`);
+    throw new Error(`Invalid duration: ${String(durationMinutes)} min`);
   }
   if (!Number.isInteger(guestCount) || guestCount < 0 || guestCount > DEFAULT_GUEST_COUNT) {
-    throw new Error(`Invalid guest count: ${guestCount}`);
+    throw new Error(`Invalid guest count: ${String(guestCount)}`);
+  }
+  if (payment !== 'wallet' && payment !== 'card') {
+    throw new Error(`Invalid payment mode: expected 'wallet' or 'card'`);
   }
 
-  const participants = [request.accountId, ...Array<number>(guestCount).fill(GUEST_ACCOUNT_ID)].join(',');
-  const wallet = request.payment === 'wallet';
+  const participants = [accountId, ...Array<number>(guestCount).fill(GUEST_ACCOUNT_ID)].join(',');
+  const wallet = payment === 'wallet';
 
   return new URLSearchParams([
-    ['hash', request.hash],
+    ['hash', hash],
     ['id_reserva', ''],
     ['libres', '0'],
     ['libres_step', '1'],
@@ -72,8 +89,8 @@ export const buildAddEventBody = (request: AddEventRequest): string => {
     ['nivel_max', '7'],
     ['sx', '-'],
     ['lista_usuarios', '0'],
-    ['data', `${request.gameDate} 00:00:00`],
-    ['recurso', String(request.courtId)],
+    ['data', `${gameDate} 00:00:00`],
+    ['recurso', String(courtId)],
     ['op', 'add_event'],
     ['desactivar_pago', '0'],
     ['tipo_pago_anticipado_socio', wallet ? '5' : '2'],
@@ -83,8 +100,8 @@ export const buildAddEventBody = (request: AddEventRequest): string => {
     ['esReservaFija', '0'],
     ['tipoabonos', '0'],
     ['tipo_pago_anticipado_tpvonline', wallet ? '0' : '1'],
-    ['duration', String(request.durationMinutes)],
-    ['time_ini', formatClock(request.startMinutes)],
+    ['duration', String(durationMinutes)],
+    ['time_ini', formatClock(startMinutes)],
     ['socis', participants],
   ]).toString();
 };

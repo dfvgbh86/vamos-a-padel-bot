@@ -8,15 +8,21 @@ A personal Telegram bot that books a padel court at [Enjoy Valencia](https://enj
 > and the Telegram bot are next. See [PLAN.md](PLAN.md) (in Russian) for the verified protocol notes,
 > design invariants and roadmap.
 
-## Rules baked into the code
+## Implemented rules
 
-- A game day `D` opens for booking at **`D-7` 07:00 Europe/Madrid**.
+- A game day `D` opens for booking at **`D-7` 07:00 Europe/Madrid** (DST-safe, configurable rule).
 - On weekdays the academy courts (resource ids `1, 2, 3, 7, 8`, i.e. Pista 1-3 and 5-6) are **never** booked;
-  on weekends and configured holidays all ten courts are allowed. The guard lives inside the booking-body
-  builder, on the exact values that are serialised.
+  on weekends and official Valencia holidays (2026-2027 built in) all ten courts are allowed. The guard lives
+  inside the booking-body builder, on the exact values that are serialised.
+- The request body is built in exactly one place; payment must be explicitly `wallet` or `card`.
+- Response classifiers never report `ok` without a 2xx status and an explicit reservation id; anything
+  unrecognised is `unknown` (never retried blindly).
+
+## Design invariants (planned, see PLAN.md section 3a)
+
 - One booking per day, 90 minutes by default, host + 3 guests, paid from the club's virtual wallet.
-- A POST is only allowed after the server itself rendered an open booking form; unknown responses are never
-  retried blindly; at most one booking request is in flight.
+- A booking request is only sent after the server itself rendered an open booking form; at most one booking
+  request is in flight; an unclear outcome ("ambiguous") blocks re-sending until the calendar is checked.
 
 ## Development
 

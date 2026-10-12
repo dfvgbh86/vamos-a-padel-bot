@@ -5,3 +5,12 @@ dist/
 *.sqlite-journal
 data/
 logs/
+.env.*
+!.env.example
+*.sqlite-wal
+*.sqlite-shm
+*.db
+.idea/
+.vscode/
+*.iml
+.DS_Store
