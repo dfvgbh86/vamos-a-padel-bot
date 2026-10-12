@@ -13,7 +13,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "luxon": "^3.5.0"
+    "grammy": "^1.46.0",
+    "luxon": "^3.5.0",
+    "pino": "^10.4.0",
+    "tough-cookie": "^6.0.2",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/luxon": "^3.4.2",
