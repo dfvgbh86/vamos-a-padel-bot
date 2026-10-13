@@ -10,6 +10,7 @@ export type CallbackAction =
   | { readonly type: 'pickDate'; readonly sid: string; readonly date: GameDate }
   | { readonly type: 'pickCourt'; readonly sid: string; readonly courtId: number }
   | { readonly type: 'pickTime'; readonly sid: string; readonly courtId: number; readonly startMinutes: number }
+  | { readonly type: 'setDuration'; readonly sid: string; readonly minutes: number }
   | { readonly type: 'undo'; readonly sid: string }
   | { readonly type: 'toCourts'; readonly sid: string }
   | { readonly type: 'toDates'; readonly sid: string }
@@ -61,6 +62,10 @@ const RULES: readonly Rule[] = [
       return { type: 'pickTime', sid: match[1] as string, courtId: Number(match[2]), startMinutes };
     },
   },
+  {
+    pattern: new RegExp(`^n:m:${SID}:(60|90)$`),
+    build: (match) => ({ type: 'setDuration', sid: match[1] as string, minutes: Number(match[2]) }),
+  },
   { pattern: new RegExp(`^n:u:${SID}$`), build: simple('undo') },
   { pattern: new RegExp(`^n:k:${SID}$`), build: simple('toCourts') },
   { pattern: new RegExp(`^n:r:${SID}$`), build: simple('toDates') },
@@ -96,6 +101,8 @@ export const encodeCallbackData = (action: CallbackAction): string => {
       return checked(`n:c:${action.sid}:${action.courtId}`);
     case 'pickTime':
       return checked(`n:t:${action.sid}:${action.courtId}:${action.startMinutes}`);
+    case 'setDuration':
+      return checked(`n:m:${action.sid}:${action.minutes}`);
     case 'undo':
       return checked(`n:u:${action.sid}`);
     case 'toCourts':

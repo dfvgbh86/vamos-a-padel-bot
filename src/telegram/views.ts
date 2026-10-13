@@ -4,7 +4,7 @@ import type { SlotChoice } from '../contracts.js';
 import { encodeCallbackData } from './callbackData.js';
 import { courtName, formatClock, formatDayLong, formatDayShort, formatMadrid, formatTimeRange } from './format.js';
 import { choiceLines } from './jobText.js';
-import type { CourtOption, OfferedDate } from './schedule.js';
+import { DURATION_OPTIONS, type CourtOption, type OfferedDate } from './schedule.js';
 import type { PickerMode } from './sessions.js';
 
 export interface View {
@@ -62,8 +62,8 @@ export const datesView = (offered: readonly OfferedDate[], sid: string, notice?:
   };
 };
 
-const courtPrompt = (options: readonly CourtOption[]): string => {
-  if (options.length === 0) return 'Нет свободных слотов на 90 минут. Выберите другую дату.';
+const courtPrompt = (options: readonly CourtOption[], durationMinutes: number): string => {
+  if (options.length === 0) return `Нет свободных слотов на ${durationMinutes} минут. Выберите другую дату или длительность.`;
   return options.some((option) => option.startCount !== null) ? 'Выберите корт (число — свободные старты):' : 'Выберите корт:';
 };
 
@@ -75,13 +75,18 @@ export interface CourtsViewInput {
   readonly mode: PickerMode;
   readonly options: readonly CourtOption[];
   readonly choices: readonly SlotChoice[];
+  readonly durationMinutes: number;
   readonly hasOwnBooking: boolean;
   readonly notice?: string;
 }
 
 export const courtsView = (input: CourtsViewInput): View => {
-  const { sid, choices } = input;
+  const { sid, choices, durationMinutes } = input;
   const keyboard = new InlineKeyboard();
+  for (const minutes of DURATION_OPTIONS) {
+    keyboard.text(`${minutes === durationMinutes ? '✓ ' : ''}⏱ ${minutes} мин`, encodeCallbackData({ type: 'setDuration', sid, minutes }));
+  }
+  keyboard.row();
   for (const row of chunk(input.options, COURTS_PER_ROW)) {
     for (const option of row) {
       const suffix = option.startCount === null ? '' : ` · ${option.startCount}`;
@@ -94,14 +99,14 @@ export const courtsView = (input: CourtsViewInput): View => {
   keyboard.row().text('📅 Другая дата', encodeCallbackData({ type: 'toDates', sid })).text('✖ Выйти', encodeCallbackData({ type: 'abort', sid }));
 
   const lines = [
-    `<b>${formatDayLong(input.gameDate)}</b> · 90 мин`,
+    `<b>${formatDayLong(input.gameDate)}</b> · ${durationMinutes} мин`,
     windowLine(input.open, input.opensAtMs),
     ...(input.hasOwnBooking ? ['⚠️ На эту дату у вас уже есть бронь: задание будет отклонено (одна бронь в день).'] : []),
     ...modeHint(input.mode),
     '',
     ...chosenBlock(choices),
     '',
-    courtPrompt(input.options),
+    courtPrompt(input.options, durationMinutes),
   ];
   return { text: withNotice(lines, input.notice), keyboard };
 };
@@ -112,11 +117,12 @@ export interface TimesViewInput {
   readonly courtId: number;
   readonly starts: readonly number[];
   readonly choices: readonly SlotChoice[];
+  readonly durationMinutes: number;
   readonly notice?: string;
 }
 
 export const timesView = (input: TimesViewInput): View => {
-  const { sid, courtId, choices } = input;
+  const { sid, courtId, choices, durationMinutes } = input;
   const picked = new Set(choices.filter((choice) => choice.courtId === courtId).map((choice) => choice.startMinutes));
   const keyboard = new InlineKeyboard();
   for (const row of chunk(input.starts, TIMES_PER_ROW)) {
@@ -130,7 +136,9 @@ export const timesView = (input: TimesViewInput): View => {
 
   const lines = [
     `<b>${courtName(courtId)}</b> · ${formatDayShort(input.gameDate)}`,
-    input.starts.length === 0 ? 'На этом корте нет свободных слотов на 90 минут.' : 'Выберите время начала (игра 90 минут):',
+    input.starts.length === 0
+      ? `На этом корте нет свободных слотов на ${durationMinutes} минут.`
+      : `Выберите время начала (игра ${durationMinutes} минут) или напишите своё сообщением, например 18:30:`,
     '',
     ...chosenBlock(choices),
   ];

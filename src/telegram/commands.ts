@@ -87,5 +87,10 @@ export const registerCommands = (bot: Bot, deps: CommandDeps): void => {
     await reply(ctx, RESUME_TEXT);
   });
 
+  bot.on('message:text', async (ctx, next) => {
+    if (await newJob.text(ctx)) return;
+    await next();
+  });
+
   bot.on('message', (ctx) => reply(ctx, UNKNOWN_INPUT_TEXT));
 };

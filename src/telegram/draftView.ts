@@ -23,7 +23,8 @@ export const draftView = (deps: DraftViewDeps, draft: Draft, notice?: string): V
   }
   const opensAtMs = bookingOpensAt(gameDate, deps.openRule).toMillis();
   const open = opensAtMs <= nowMs;
-  const common = { sid: draft.sid, gameDate, choices: draft.choices, notice };
+  const durationMinutes = draft.durationMinutes;
+  const common = { sid: draft.sid, gameDate, choices: draft.choices, durationMinutes, notice };
 
   switch (draft.view.kind) {
     case 'courts':
@@ -32,16 +33,16 @@ export const draftView = (deps: DraftViewDeps, draft: Draft, notice?: string): V
         open,
         opensAtMs,
         mode,
-        options: courtOptions(deps.service.allowedCourts(gameDate), mode, DURATION_MINUTES),
+        options: courtOptions(deps.service.allowedCourts(gameDate), mode, durationMinutes),
         hasOwnBooking: mode.kind === 'schedule' && hasOwnBooking(mode.schedule),
       });
     case 'times':
       return timesView({
         ...common,
         courtId: draft.view.courtId,
-        starts: startsForCourt(mode, draft.view.courtId, DURATION_MINUTES),
+        starts: startsForCourt(mode, draft.view.courtId, durationMinutes),
       });
     case 'confirm':
-      return confirmView({ ...common, open, opensAtMs, durationMinutes: DURATION_MINUTES });
+      return confirmView({ ...common, open, opensAtMs });
   }
 };

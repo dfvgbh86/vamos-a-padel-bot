@@ -64,6 +64,8 @@ export interface Draft extends Expiring {
   readonly sid: string;
   readonly view: DraftView;
   readonly gameDate: GameDate | null;
+  /** 60 or 90 minutes; changing it clears the choices (free starts differ). */
+  readonly durationMinutes: number;
   readonly mode: PickerMode | null;
   /** Priority order. */
   readonly choices: readonly SlotChoice[];

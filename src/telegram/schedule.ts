@@ -10,6 +10,13 @@ export const COMMON_START_MINUTES: readonly number[] = Array.from({ length: 25 }
 
 export const MAX_CHOICES = 8;
 
+/** Game lengths offered in /new (the club's minimum is 60 minutes). */
+export const DURATION_OPTIONS: readonly number[] = [60, 90];
+
+/** Typed start times must fall inside these club hours (the calendar runs from 07:30 to 22:30). */
+export const EARLIEST_START_MINUTES = 7 * 60;
+export const LATEST_END_MINUTES = 23 * 60;
+
 const MAX_DATE_BUTTONS = 14;
 
 export interface OfferedDate {
