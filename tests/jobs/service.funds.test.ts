@@ -10,6 +10,22 @@ afterEach(cleanupTemp);
 const FUTURE = date('2026-10-21');
 
 describe('createJob: funds check (owner requirement)', () => {
+  it('reads the wallet and the price BEFORE the job is stored (a stored open-window job would stop the owner from logging in again)', async () => {
+    const { service, api, store } = harness();
+    const jobsSeen: number[] = [];
+    api.getWallet.mockImplementation(() => {
+      jobsSeen.push(store.list().length);
+      return Promise.resolve({ balanceCents: 5000 });
+    });
+    api.quote.mockImplementation(() => {
+      jobsSeen.push(store.list().length);
+      return Promise.resolve({ totalCents: 1902, walletPayable: true });
+    });
+    created(await service.createJob(request()));
+    expect(jobsSeen).toEqual([0, 0]);
+    expect(store.list()).toHaveLength(1);
+  });
+
   it('reports ok when the wallet covers the quoted price', async () => {
     const { service, api } = harness();
     api.getWallet.mockResolvedValue({ balanceCents: 5000 });

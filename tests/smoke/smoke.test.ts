@@ -363,13 +363,12 @@ describe('the built bot against a fake club and a fake Telegram', () => {
     expect(clubTraffic).not.toContain(synthetic.botTokenSecret);
     expect(clubTraffic).not.toContain(synthetic.botToken);
 
-    // Nothing went wrong behind the scenes. The only warnings: the announced API root, the ignored strangers, and the
-    // price estimate of /new (the account id, which the quote needs, is read by the first preflight, not before it).
+    // Nothing went wrong behind the scenes. The only warnings: the announced API root and the ignored strangers (the
+    // price of /new is quoted for real: the quote reads the booking form itself to learn the account id).
     const warnings = lines.filter((line) => line.level >= 40);
     expect([...new Set(warnings.map((line) => line.msg))].sort()).toEqual(
-      [IGNORED_SENDER, 'telegram: the Bot API root is overridden (tests only)', 'price quote failed, using the estimate'].sort(),
+      [IGNORED_SENDER, 'telegram: the Bot API root is overridden (tests only)'].sort(),
     );
-    expect(warnings.find((line) => line.msg === 'price quote failed, using the estimate')?.fields['errorName']).toBe('AccountUnknownError');
     expect(running().stderr()).toBe('');
   });
 

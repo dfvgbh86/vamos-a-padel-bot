@@ -103,6 +103,11 @@ export const createJobService = (deps: JobServiceDeps): JobService => {
       if (ownBooking === 'present') return rejected('own_booking_exists', `the account already has a booking on ${gameDate}`);
     }
 
+    // Before the job exists: a stored job of an open window counts as "the sniper needs the session" (see ownerApi), so the
+    // owner's own balance check could not log in again, and the sniper's own login would race with it.
+    const slot = { gameDate, courtId: choices[0].courtId, startMinutes: choices[0].startMinutes, durationMinutes };
+    const funds = await assessFunds(api, logger, { slot, payment, windowOpen, estimatedPriceCents });
+
     let job: Job;
     try {
       job = store.create({ gameDate, choices, durationMinutes, payment }, opensAtMs, clock.nowMs());
@@ -110,9 +115,6 @@ export const createJobService = (deps: JobServiceDeps): JobService => {
       if (error instanceof DuplicateActiveJobError) return duplicate(gameDate);
       throw error;
     }
-
-    const slot = { gameDate, courtId: choices[0].courtId, startMinutes: choices[0].startMinutes, durationMinutes };
-    const funds = await assessFunds(api, logger, { slot, payment, windowOpen, estimatedPriceCents });
     logger.info(
       { jobId: job.id, gameDate, choices: choices.length, payment, windowOpen, fundsOk: funds.fundsOk, estimate: funds.requiredIsEstimate },
       'job created',

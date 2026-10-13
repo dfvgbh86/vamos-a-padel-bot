@@ -59,7 +59,11 @@ describe('getAccountContext()', () => {
     const { site, client } = await loggedIn();
     site.state.form = () => htmlResponse(closedWindowHtml());
     await failureOf(client.getAccountContext(slotRef()));
-    await expect(client.quote(slotRef(), 'wallet')).rejects.toBeInstanceOf(AccountUnknownError);
+    site.calls.length = 0;
+    // quote() tries to learn the account id itself: the closed form fails it, and no price request goes out.
+    await expect(client.quote(slotRef(), 'wallet')).rejects.toBeInstanceOf(Error);
+    expect(site.calls.map((call) => call.url)).toHaveLength(1);
+    expect(site.calls[0]?.url).toContain('/reserves/cal_event.php');
   });
 
   it('never puts the hash into an error', async () => {
@@ -127,10 +131,14 @@ describe('quote()', () => {
     return context;
   };
 
-  it('needs the account id first and sends nothing without it', async () => {
+  it('learns the account id from the booking form of the slot first, then asks for the prices', async () => {
     const { site, client } = await loggedIn();
-    await expect(client.quote(slotRef(), 'wallet')).rejects.toBeInstanceOf(AccountUnknownError);
-    expect(site.calls).toHaveLength(0);
+    await client.quote(slotRef(), 'wallet');
+    expect(site.calls.map((call) => new URL(call.url).pathname)).toEqual([
+      '/reserves/cal_event.php',
+      expect.stringContaining('pago_anticipado_select'),
+      expect.stringContaining('prepago_show_info'),
+    ]);
   });
 
   it('requests the payment options and the guest prices with the exact URLs', async () => {

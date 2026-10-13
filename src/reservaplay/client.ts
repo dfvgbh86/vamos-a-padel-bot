@@ -227,7 +227,8 @@ export const createReservaplayClient = (config: ReservaplayClientConfig): Reserv
   };
 
   const quote = async (slot: SlotRef): Promise<PriceQuote> => {
-    const accountId = requireAccountId();
+    // The account id only shows in a rendered booking form: read this slot's form when nothing has revealed it yet.
+    const accountId = knownAccountId ?? (await getAccountContext(slot)).accountId;
     const response = await get('payment_options', endpoints.paymentOptions(slot, accountId), { ...XHR, ...ACCEPT_JSON });
     expectStatus200(response, 'Payment options');
     const payload = decodeJson(response.text);
