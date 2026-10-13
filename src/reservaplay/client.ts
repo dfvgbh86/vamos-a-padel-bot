@@ -15,7 +15,7 @@ import type {
 import { buildAddEventBody, DEFAULT_GUEST_COUNT } from './bookingBody.js';
 import { classifyAddEventResponse, classifyFormPage, classifyTransportFailure, type FormGate } from './classify.js';
 import { cancelBody, createEndpoints } from './client/endpoints.js';
-import { ACCEPT_HTML, ACCEPT_JSON, FORM_ENCODED, MANAGER_POST_HEADERS, XHR } from './client/headers.js';
+import { ACCEPT_HTML, ACCEPT_JSON, ACCEPT_LANGUAGE, errorPageTitle, FORM_ENCODED, MANAGER_POST_HEADERS, pageHeaders, XHR } from './client/headers.js';
 import { decodeJson, expectStatus200, interpretCancel, isAnswerToTrust, rejectLoginPage, transportFailedCancel } from './client/responses.js';
 import { AuthExpiredError, LoginFailedError, UnexpectedResponseError } from './errors.js';
 import {
@@ -168,7 +168,11 @@ export const createReservaplayClient = (config: ReservaplayClientConfig): Reserv
   };
 
   const fetchForm = async (slot: SlotRef, label: string): Promise<{ readonly gate: FormGate; readonly html: string }> => {
-    const response = await get(label, endpoints.slotForm(slot, config.now()), ACCEPT_HTML);
+    const response = await get(label, endpoints.slotForm(slot, config.now()), {
+      ...ACCEPT_HTML,
+      ...ACCEPT_LANGUAGE,
+      ...pageHeaders(baseUrl, slot.gameDate),
+    });
     const failed = (): UnexpectedResponseError => new UnexpectedResponseError(`Booking form answered HTTP ${response.status}`, response.status);
     if (response.status >= 300 && (response.status < 400 || response.status >= 500)) throw failed();
     const gate = classifyFormPage(response.text);
@@ -227,19 +231,20 @@ export const createReservaplayClient = (config: ReservaplayClientConfig): Reserv
     return { totalCents, walletPayable: options.walletPayable };
   };
 
-  const sendBooking = async (body: string): Promise<BookResult> => {
+  const sendBooking = async (body: string, gameDate: GameDate): Promise<BookResult> => {
     try {
       const response = await http.request({
         method: 'POST',
         url: endpoints.manager,
         label: 'add_event',
-        headers: MANAGER_POST_HEADERS,
+        headers: { ...MANAGER_POST_HEADERS, ...pageHeaders(baseUrl, gameDate) },
         body,
         timeoutMs: bookTimeoutMs,
         onAuthRejected: 'return',
       });
       // A gateway answered for a request the backend may have processed: same uncertainty as a timeout.
       if (response.status === 502 || response.status === 504) return classifyTransportFailure(true);
+      if (response.status >= 500) logger.warn({ status: response.status, title: errorPageTitle(response.text) }, 'booking request got a server error');
       const outcome = classifyAddEventResponse({ status: response.status, location: response.location, body: response.text });
       return outcome.kind === 'ok' ? { kind: 'booked', reservationId: outcome.reservationId } : { kind: 'rejected', outcome };
     } catch (error) {
@@ -267,7 +272,7 @@ export const createReservaplayClient = (config: ReservaplayClientConfig): Reserv
         payment: request.payment,
         holidays: request.holidays ?? holidays,
       });
-      const result = await sendBooking(body);
+      const result = await sendBooking(body, slot.gameDate);
       logger.info({ outcome: result.kind === 'rejected' ? result.outcome.kind : result.kind }, 'booking request finished');
       return result;
     } finally {
