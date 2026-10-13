@@ -24,6 +24,7 @@ describe('classifyAddEventResponse', () => {
   it('maps the known site messages', () => {
     const body = (msg: string) => json({ status: 'error', data: { msg } });
     expect(classifyAddEventResponse(body('No se puede reservar a 8 o más dias vista.')).kind).toBe('not_open_yet');
+    expect(classifyAddEventResponse(body('No puedes reservar hasta las 07:00. Hora actual comprobación:13/10/2026 00:10:08')).kind).toBe('not_open_yet');
     expect(classifyAddEventResponse(body('Ya tienes 1 reserva/s para este dia.')).kind).toBe('daily_limit');
     expect(classifyAddEventResponse(body('El tiempo de reserva mínimo es de 60 minutos')).kind).toBe('too_short');
   });
@@ -83,6 +84,14 @@ describe('classifyFormPage', () => {
     const gate = classifyFormPage(html);
     expect(gate.kind).toBe('window_closed');
     expect(gate.kind === 'window_closed' && gate.serverCheckTime?.toISO()).toBe('2026-10-12T22:33:54.000+02:00');
+  });
+
+  it('window_closed for the real midnight-to-07:00 wording, with the server clock', () => {
+    const html =
+      '<div class="msg msg-error">Usuarios<br/>No puedes reservar hasta las 07:00. Hora actual comprobación:13/10/2026 00:10:08. Para volver a hacer la comprobación actualiza la página o vuelve a entrar en la reserva</div>';
+    const gate = classifyFormPage(html);
+    expect(gate.kind).toBe('window_closed');
+    expect(gate.kind === 'window_closed' && gate.serverCheckTime?.toISO()).toBe('2026-10-13T00:10:08.000+02:00');
   });
 
   it('daily_limit, too_short and login_required', () => {

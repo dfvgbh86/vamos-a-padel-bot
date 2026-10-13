@@ -24,7 +24,13 @@ const truncateByCodePoints = (text: string, limit: number): string =>
 /** "Ya tienes 1 reserva/s para este dia." - digits are required so "¿Ya tienes cuenta?" never matches. */
 const DAILY_LIMIT_MESSAGE = /ya tienes \d+ reserva/;
 
-const isNotOpenYetText = (text: string): boolean => text.includes('dias vista');
+/**
+ * Two wordings seen on the real site while the window is closed (both embed "Hora actual comprobación"):
+ * "No se puede reservar a 8 o más dias vista" (8+ days ahead) and
+ * "No puedes reservar hasta las 07:00" (7 days ahead, between midnight and the opening hour).
+ */
+const isNotOpenYetText = (text: string): boolean =>
+  text.includes('dias vista') || text.includes('no puedes reservar hasta las');
 const isDailyLimitText = (text: string): boolean => DAILY_LIMIT_MESSAGE.test(text);
 const isTooShortText = (text: string): boolean => text.includes('tiempo de reserva minimo');
 

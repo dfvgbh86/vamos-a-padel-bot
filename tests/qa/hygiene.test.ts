@@ -83,6 +83,7 @@ describe('QA hygiene: pure-logic modules stay pure (no clock, no console, no net
   it('found the modules', () => {
     expect(pure.map(rel).sort()).toEqual([
       'src/config/courts.ts',
+      'src/config/env.ts',
       'src/config/gameDate.ts',
       'src/config/holidays.ts',
       'src/config/timezone.ts',
