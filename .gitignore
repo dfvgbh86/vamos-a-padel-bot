@@ -16,3 +16,6 @@ logs/
 .DS_Store
 .claude/
 logs/
+
+# Private working notes (never published)
+docs/untrackable/

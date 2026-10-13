@@ -46,7 +46,7 @@ const quoteOrUndefined = async (
 };
 
 /**
- * The wallet option the site shows is the authority on affordability (PLAN 3a.7): a disabled option is short whatever
+ * The wallet option the site shows is the authority on affordability (CONTRACT C7): a disabled option is short whatever
  * the balance says, and a known balance must cover the price too. Without a balance only a site that confirms the
  * option can vouch for the funds; otherwise they cannot be verified, which is reported like a shortage.
  */

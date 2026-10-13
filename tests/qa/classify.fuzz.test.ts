@@ -328,7 +328,7 @@ describe('QA classifyFormPage', () => {
   });
 
   it('CHARACTERISATION (decision needed): closed-window text AND a form with a hash => currently `open`', () => {
-    // PLAN §2: "Есть форма => бронь разрешена". If the owner prefers the opposite precedence this test must flip.
+    // CONTRACT C1: a rendered open form is what allows the booking. If the owner prefers the opposite precedence this test must flip.
     const html = `<div class="msg">No se puede reservar a 8 o más dias vista</div>${form(`<input name="hash" value="${FAKE_HASH}">`)}`;
     expect(classifyFormPage(html)).toEqual({ kind: 'open', hash: FAKE_HASH });
   });

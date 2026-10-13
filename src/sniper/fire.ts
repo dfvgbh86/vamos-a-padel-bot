@@ -12,7 +12,7 @@ import { describeError, InvariantError } from './types.js';
 export type { FireDeps } from './fireContext.js';
 export { UNKNOWN_RESERVATION_ID, type FireFailureReason, type FireOptions, type FireResult } from './fireTypes.js';
 
-/** Keyed by api object, i.e. by account/session: at most ONE add_event in flight (PLAN 3a, item 2). */
+/** Keyed by api object, i.e. by account/session: at most ONE add_event in flight (CONTRACT C2). */
 const bookingInFlight = new WeakSet<object>();
 
 type Probe =
@@ -247,7 +247,7 @@ const step = async (ctx: FireContext): Promise<FireResult | null> => {
 };
 
 /**
- * The firing loop (PLAN 3a / 4). The window is never bypassed: a booking request is built only after the server
+ * The firing loop (CONTRACT C1). The window is never bypassed: a booking request is built only after the server
  * itself rendered an open form for that very slot, one request at a time, and an unclear outcome is reconciled
  * against the calendar first (a 5xx or a lost answer may go back to the gate when nothing was found, an answer nobody
  * understood never does for the same slot). The job must already be in the `firing` state.

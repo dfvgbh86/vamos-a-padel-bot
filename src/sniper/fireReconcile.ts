@@ -77,7 +77,7 @@ const settle = (ctx: FireContext, looked: Looked, otherwise: FireFailureReason):
  * The request may have been processed (timeout, reset, 5xx): look for the booking before anything else.
  * Null = nothing was found in a calendar that was actually read, and attempts and time remain: the gate loop goes
  * on, and sending again needs a fresh open probe (which shows `daily_limit` if a booking exists after all). A
- * calendar that could not be read leaves the outcome unresolved: nothing is sent again (PLAN 3a, item 3).
+ * calendar that could not be read leaves the outcome unresolved: nothing is sent again (CONTRACT C3).
  */
 export const reconcileUnclear = async (
   ctx: FireContext,

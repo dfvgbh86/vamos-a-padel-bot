@@ -48,7 +48,7 @@ describe('QA hygiene: no secrets in the repository', () => {
   });
 
   it('no session-cookie or CSRF token assignments in any text file (laravel_session=..., XSRF-TOKEN=..., Bearer ...)', () => {
-    const files = textFiles().filter((path) => !path.endsWith('PLAN.md'));
+    const files = textFiles();
     expect(grepLines(files, /(laravel_session|XSRF-TOKEN|AWSALB\w*)\s*=\s*[A-Za-z0-9%+/_-]{16,}/g)).toEqual([]);
     expect(grepLines(files, /\bBearer\s+[A-Za-z0-9._-]{20,}/g)).toEqual([]);
   });

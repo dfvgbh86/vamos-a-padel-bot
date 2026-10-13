@@ -3,12 +3,10 @@
 A personal Telegram bot that books a padel court at [Enjoy Valencia](https://enjoyvalenciaclubesoutdoor.reservaplay.com)
 (ReservaPlay platform) the moment the booking window opens, using the owner's own account.
 
-> **Status: complete, tested against fakes only.** Every part exists (ReservaPlay client, job store and service,
-> sniper, Telegram bot, startup/shutdown wiring, owner CLI) and is covered by unit tests plus an end-to-end
-> simulation with a fake site, a virtual clock and a fake Telegram transport. **Nothing has been run against the
-> real site or the real Telegram yet**: the first live checks are yours, see "Running on your PC". The verified
-> protocol notes, the design invariants and the open questions (what the site answers when a slot is taken, whether
-> the account `hash` survives a new login, ...) are in [PLAN.md](PLAN.md) (in Russian).
+> **Status: working.** Login, calendar, wallet, a booking made through the bot's own requests and its cancellation have been
+> run against the real club site, and a booking has been made end to end from Telegram. What the site answers for a slot
+> that was just taken or for an empty wallet has not been observed yet: such an answer stops the job with an alert. The
+> rules and invariants are in [CONTRACT.md](CONTRACT.md).
 
 ## What it does
 
@@ -124,13 +122,13 @@ src/app.ts        wiring: store -> recovery -> sniper -> Telegram; orderly shutd
 src/main.ts       loads the environment and runs the app; src/index.ts is the entry point
 src/cli.ts        owner CLI entry point; commands in src/cli/
 tests/            unit tests + tests/app (wiring, CLI, end-to-end simulation) + tests/smoke (built bot, real sockets)
-PLAN.md           protocol notes, invariants, roadmap (Russian)
+CONTRACT.md       what the bot promises (rules, invariants) and relies on
 ```
 
 ## Not done yet
 
-- Everything against the live site and Telegram (see above); the answers for a slot that was just taken, for an empty
-  wallet and for other refusals are not known, so such an answer stops the job with an alert.
+- The answers of the site for a slot that was just taken, for an empty wallet and for other refusals are not known, so
+  such an answer stops the job with an alert.
 - A wake timer, Windows autostart, a watch mode for freed slots, a card-payment fallback (off by design).
 
 ## Disclaimer

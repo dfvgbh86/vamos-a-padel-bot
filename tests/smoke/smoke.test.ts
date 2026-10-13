@@ -65,7 +65,7 @@ const running = (): BotProcess => {
   return bot;
 };
 
-/** The add_event body the site's own form sends (PLAN section 2), written out independently of src/. */
+/** The add_event body the site's own form sends (see CONTRACT.md), written out independently of src/. */
 const expectedBody = (courtId: number): string =>
   [
     `hash=${synthetic.hash}`,

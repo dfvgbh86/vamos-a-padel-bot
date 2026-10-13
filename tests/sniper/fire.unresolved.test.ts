@@ -18,7 +18,7 @@ const courtsWithoutSlots: Pick<ApiScript, 'getDay'> = {
   getDay: (date) => ({ gameDate: date, courts: makeDay(date).courts.map((court) => ({ ...court, slots: [] })) }),
 };
 
-describe('an unclear answer is never followed by a second add_event while the calendar could not be read (PLAN 3a.3)', () => {
+describe('an unclear answer is never followed by a second add_event while the calendar could not be read (CONTRACT C3)', () => {
   const answers = [
     ['ambiguous', ambiguous],
     ['server_error', serverError],

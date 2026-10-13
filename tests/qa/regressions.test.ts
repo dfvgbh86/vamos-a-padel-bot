@@ -41,7 +41,7 @@ afterEach(() => {
 });
 
 describe('BUG-1 [medium] bookingBody.ts:64,79,85 - any payment value other than "wallet" silently becomes the CARD variant', () => {
-  // card = tipo_pago 2 / tpvonline 1 = an unpaid booking that eats the daily limit (PLAN 3a.8: card fallback must be OFF by default)
+  // card = tipo_pago 2 / tpvonline 1 = an unpaid booking that eats the daily limit (CONTRACT C8: card fallback must be OFF by default)
   it.each([undefined, null, 'WALLET', 'Wallet', ' wallet', 'walet', 'monedero', '', 0, false, {}, 5])(
     'payment %j must throw instead of building a card booking',
     (payment) => {
@@ -241,7 +241,7 @@ describe('BUG-15 [low] classify.ts:42 - the 160-char cut can split a surrogate p
 // Repository hygiene
 // ---------------------------------------------------------------------------------------------
 
-describe('BUG-14 [low] .gitignore - secrets/data patterns that the stack in PLAN.md will produce are not ignored', () => {
+describe('BUG-14 [low] .gitignore - secrets/data patterns that the stack of this project will produce are not ignored', () => {
   const rules = readFileSync(join(ROOT, '.gitignore'), 'utf8')
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -261,7 +261,7 @@ describe('BUG-14 [low] .gitignore - secrets/data patterns that the stack in PLAN
     if (covers('.env.*', '.env*')) expect(covers('!.env.example')).toBe(true);
   });
 
-  it('ignores SQLite WAL/SHM side files that better-sqlite3 creates (PLAN: SQLite store)', () => {
+  it('ignores SQLite WAL/SHM side files that better-sqlite3 creates', () => {
     expect(covers('*.sqlite-wal', '*.sqlite*', '*.sqlite-*')).toBe(true);
     expect(covers('*.sqlite-shm', '*.sqlite*', '*.sqlite-*')).toBe(true);
   });

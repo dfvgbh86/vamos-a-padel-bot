@@ -24,7 +24,7 @@ export const failJob = (ctx: FireContext, reason: FireFailureReason): FireResult
   return { kind: 'failed', reason };
 };
 
-/** Stores the booking BEFORE the event is emitted (PLAN 3a, item 3). `reservationId` null = found in the calendar. */
+/** Stores the booking BEFORE the event is emitted (CONTRACT C3, C12). `reservationId` null = found in the calendar. */
 export const finishBooked = (ctx: FireContext, choice: SlotChoice, reservationId: number | null): FireResult => {
   const { store, clock, events, logger } = ctx.deps;
   const target: JobState = ctx.job.payment === 'card' ? 'needs_payment' : 'booked';
