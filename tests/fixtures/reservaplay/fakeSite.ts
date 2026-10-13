@@ -1,4 +1,4 @@
-import { CSRF_TOKEN, PASSWORD, USERNAME } from './constants.js';
+import { CSRF_TOKEN, PAGE_CSRF_TOKEN, PASSWORD, USERNAME } from './constants.js';
 import { calendarPayload } from './calendar.js';
 import { createFakeFetch, type FakeFetch, type RecordedCall } from './fakeFetch.js';
 import {
@@ -80,7 +80,7 @@ export const createFakeSite = (): FakeSite => {
 
     switch (url.pathname) {
       case '/reserves/cal_week.php':
-        return htmlResponse('<html><body><div id="week">Semana</div></body></html>');
+        return htmlResponse(`<html><head><meta name="csrf_token" content="${PAGE_CSRF_TOKEN}"></head><body><div id="week">Semana</div></body></html>`);
       case '/api/tipo_recurso/1/reservas_usuario':
         return jsonResponse(state.calendar());
       case '/reserves/cal_event.php':

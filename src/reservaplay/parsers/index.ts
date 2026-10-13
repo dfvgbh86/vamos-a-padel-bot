@@ -1,5 +1,5 @@
 export { parseCalendar } from './calendar.js';
-export { parseCsrfToken } from './loginPage.js';
+export { parseCsrfMeta, parseCsrfToken } from './loginPage.js';
 export { parseGuestPrices } from './guestPrices.js';
 export { parseHostAccountId } from './hostAccount.js';
 export { parseMoneyCents } from './money.js';

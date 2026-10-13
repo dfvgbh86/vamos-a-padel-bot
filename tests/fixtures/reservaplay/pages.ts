@@ -1,10 +1,10 @@
-import { ACCOUNT_ID, CSRF_TOKEN, GUEST_PRICE_TEXT, HASH, HOST_NAME } from './constants.js';
+import { ACCOUNT_ID, CSRF_TOKEN, GUEST_PRICE_TEXT, HASH, HOST_NAME, PAGE_CSRF_TOKEN } from './constants.js';
 
 /** 1902 -> "19.02": integer arithmetic only. */
 export const formatCents = (cents: number): string => `${Math.floor(cents / 100)}.${String(cents % 100).padStart(2, '0')}`;
 
 const page = (body: string): string =>
-  `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Club</title>` +
+  `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="csrf_token" content="${PAGE_CSRF_TOKEN}"><title>Club</title>` +
   `<script>var settings = { debug: false };</script><style>.msg { color: red }</style></head><body>${body}</body></html>`;
 
 export interface LoginPageOptions {

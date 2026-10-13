@@ -171,7 +171,7 @@ describe('login()', () => {
   describe('unexpected login pages', () => {
     it('throws UnexpectedResponseError when there is no CSRF token, and posts nothing', async () => {
       const site = createFakeSite();
-      site.state.loginPage = () => dailyLimitHtml();
+      site.state.loginPage = () => '<html><body>nothing useful here</body></html>';
       const error = await failureOf(makeClient(site).login());
       expect(error).toBeInstanceOf(UnexpectedResponseError);
       expect(site.calls.filter((call) => call.method === 'POST')).toHaveLength(0);

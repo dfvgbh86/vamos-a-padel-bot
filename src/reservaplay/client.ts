@@ -28,6 +28,7 @@ import {
 } from './http.js';
 import {
   parseCalendar,
+  parseCsrfMeta,
   parseCsrfToken,
   parseGuestPrices,
   parseHostAccountId,
@@ -89,6 +90,13 @@ export const createReservaplayClient = (config: ReservaplayClientConfig): Reserv
   });
 
   let knownAccountId: number | null = null;
+  /** `X-CSRF-Token` of the site's own ajax calls: the token of the logged-in pages, learnt from the keep-alive page and the booking forms. */
+  let pageCsrfToken: string | null = null;
+  const rememberPageToken = (html: string): void => {
+    const token = parseCsrfMeta(html);
+    if (token !== null) pageCsrfToken = token;
+  };
+  const csrfHeader = (): Readonly<Record<string, string>> => (pageCsrfToken === null ? {} : { 'X-CSRF-Token': pageCsrfToken });
   let bookingInFlight = false;
 
   const get = (label: string, url: string, headers: Readonly<Record<string, string>>): Promise<HttpResponse> =>
@@ -103,10 +111,12 @@ export const createReservaplayClient = (config: ReservaplayClientConfig): Reserv
     const response = await get('keep_alive', endpoints.calWeek, ACCEPT_HTML);
     expectStatus200(response, 'Keep-alive');
     rejectLoginPage(response.text);
+    rememberPageToken(response.text);
   };
 
   const performLogin = async (): Promise<void> => {
     await http.clearCookies();
+    pageCsrfToken = null;
     const page = await http.request({ method: 'GET', url: endpoints.login, label: 'login_page', headers: ACCEPT_HTML, onAuthRejected: 'return' });
     expectStatus200(page, 'Login page');
     const token = parseCsrfToken(page.text);
@@ -177,6 +187,7 @@ export const createReservaplayClient = (config: ReservaplayClientConfig): Reserv
     if (response.status >= 300 && (response.status < 400 || response.status >= 500)) throw failed();
     const gate = classifyFormPage(response.text);
     if (!isAnswerToTrust(gate, response.status)) throw failed();
+    if (gate.kind !== 'login_required') rememberPageToken(response.text);
     return { gate, html: response.text };
   };
 
@@ -232,12 +243,13 @@ export const createReservaplayClient = (config: ReservaplayClientConfig): Reserv
   };
 
   const sendBooking = async (body: string, gameDate: GameDate): Promise<BookResult> => {
+    if (pageCsrfToken === null) logger.warn({}, 'no page CSRF token known: the booking request goes without X-CSRF-Token');
     try {
       const response = await http.request({
         method: 'POST',
         url: endpoints.manager,
         label: 'add_event',
-        headers: { ...MANAGER_POST_HEADERS, ...pageHeaders(baseUrl, gameDate) },
+        headers: { ...MANAGER_POST_HEADERS, ...pageHeaders(baseUrl, gameDate), ...csrfHeader() },
         body,
         timeoutMs: bookTimeoutMs,
         onAuthRejected: 'return',
@@ -292,7 +304,7 @@ export const createReservaplayClient = (config: ReservaplayClientConfig): Reserv
         method: 'POST',
         url: endpoints.manager,
         label: 'del_event',
-        headers: MANAGER_POST_HEADERS,
+        headers: { ...MANAGER_POST_HEADERS, ...csrfHeader() },
         body,
         onAuthRejected: 'return',
       });

@@ -7,7 +7,7 @@ import { createEndpoints, cancelBody } from '../dist/src/reservaplay/client/endp
 import { MANAGER_POST_HEADERS, pageHeaders } from '../dist/src/reservaplay/client/headers.js';
 import { buildAddEventBody } from '../dist/src/reservaplay/bookingBody.js';
 import { classifyFormPage, classifyAddEventResponse } from '../dist/src/reservaplay/classify.js';
-import { parseHostAccountId, parseWalletCents, parseCsrfToken, parsePaymentOptions } from '../dist/src/reservaplay/parsers/index.js';
+import { parseHostAccountId, parseWalletCents, parseCsrfToken, parseCsrfMeta, parsePaymentOptions } from '../dist/src/reservaplay/parsers/index.js';
 import { buildHolidaySet } from '../dist/src/config/holidays.js';
 import { DateTime } from 'luxon';
 
@@ -76,6 +76,9 @@ const form = await call('booking form', 'GET', endpoints.slotForm(SLOT, now), {
   headers: { ...ACCEPT_HTML, 'Accept-Language': 'es-ES,es;q=0.9', ...pageHeaders(base, SLOT.gameDate) },
 });
 const gate = classifyFormPage(form.text);
+const pageToken = parseCsrfMeta(form.text);
+console.log(`page CSRF token found: ${pageToken !== null}`);
+const csrf = pageToken === null ? {} : { 'X-CSRF-Token': pageToken };
 const accountId = parseHostAccountId(form.text);
 console.log(`form gate: ${gate.kind}; account id found: ${accountId !== null}`);
 if (gate.kind !== 'open' || accountId === null) {
@@ -102,7 +105,7 @@ const body = buildAddEventBody({
   holidays: buildHolidaySet(undefined),
 });
 const posted = await call('add_event (the only booking request)', 'POST', endpoints.manager, {
-  headers: { ...MANAGER_POST_HEADERS, ...pageHeaders(base, SLOT.gameDate) },
+  headers: { ...MANAGER_POST_HEADERS, ...pageHeaders(base, SLOT.gameDate), ...csrf },
   body,
 });
 const outcome = classifyAddEventResponse({ status: posted.status, location: posted.location, body: posted.text });
@@ -114,7 +117,7 @@ else console.log('the answer is not JSON (a 500 page is deliberately not shown)'
 if (outcome.kind === 'ok') {
   console.log('BOOKED. Cancelling at once (refund to the Monedero) ...');
   const cancelled = await call('cancel', 'POST', endpoints.manager, {
-    headers: { ...MANAGER_POST_HEADERS, ...pageHeaders(base, SLOT.gameDate) },
+    headers: { ...MANAGER_POST_HEADERS, ...pageHeaders(base, SLOT.gameDate), ...csrf },
     body: cancelBody(outcome.reservationId, accountId),
   });
   const c = shortJson(cancelled.text);
