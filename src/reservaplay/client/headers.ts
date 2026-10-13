@@ -29,6 +29,6 @@ export const errorPageTitle = (html: string): string | null => {
   const from = head.indexOf('>', start) + 1;
   const end = head.indexOf('<', from);
   if (end === -1) return null;
-  const title = head.slice(from, end).replace(/s+/g, ' ').trim().slice(0, 150);
+  const title = head.slice(from, end).replace(/\s+/g, ' ').trim().slice(0, 150);
   return title === '' ? null : title;
 };
