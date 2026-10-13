@@ -84,10 +84,11 @@ logged, booking jobs keep running and results are still sent; restart the bot to
 | `TELEGRAM_BOT_TOKEN` | yes | Bot token from `@BotFather` |
 | `TELEGRAM_ALLOWED_USER_IDS` | yes | Comma-separated numeric Telegram user ids; empty = the bot refuses to start |
 | `RESERVAPLAY_USERNAME`, `RESERVAPLAY_PASSWORD` | yes | The club account |
-| `RESERVAPLAY_BASE_URL` | no | Default `https://enjoyvalenciaclubesoutdoor.reservaplay.com` (https only) |
+| `RESERVAPLAY_BASE_URL` | no | Default `https://enjoyvalenciaclubesoutdoor.reservaplay.com` (https only; plain http is accepted for `127.0.0.1`, `localhost` and `[::1]` alone, for the tests) |
 | `EXTRA_HOLIDAYS` | no | Comma-separated `YYYY-MM-DD` dates treated like a weekend (all courts allowed) |
 | `DB_PATH` | no | SQLite file, default `data/bot.sqlite` (the folder is created) |
 | `LOG_LEVEL` | no | `fatal` ... `trace`, `silent`; default `info` (JSON lines on stdout) |
+| `TELEGRAM_API_ROOT` | no, **tests only** | Bot API root of a fake Telegram, e.g. `http://127.0.0.1:8081`. The bot token is sent there, so only an `http` URL whose host is exactly `127.0.0.1`, `localhost` or `[::1]` is accepted; anything else is a configuration error naming this key. Leave it unset |
 
 A configuration error names the failing keys only, never their values.
 
@@ -95,10 +96,20 @@ A configuration error names the failing keys only, never their values.
 
 ```bash
 npm install
-npm test          # vitest, no network
+npm test          # vitest, no network (includes the smoke test below, about 20 s)
 npm run typecheck # tsc --noEmit
 npm run build     # tsc -p tsconfig.build.json -> dist/src
+npm run test:smoke # only the black-box smoke test
 ```
+
+The smoke test (`tests/smoke`) builds the bot, then starts the built `dist/src/index.js` as a real child process
+(`node --env-file=...`, like `npm start`) against two fake servers on `127.0.0.1` with ephemeral ports: a ReservaPlay
+club site and a Telegram Bot API (reached through the tests-only `TELEGRAM_API_ROOT`). It drives `/start` and `/new`
+with the bot's own buttons, checks that exactly one `add_event` with the expected body is sent for an already open
+date, that the job ends `booked` in a temporary SQLite file and the owner is told, that a stranger gets no reply, that
+no secret reaches the log, that shutdown is orderly (exit code 0) and that configuration errors name keys only. It uses
+only synthetic credentials generated per run, never reads your `.env`, and a connection guard fails it if the bot
+ever connects anywhere but the two fakes.
 
 ## Layout
 
@@ -112,7 +123,7 @@ src/runtime/      logger with redaction, owner-facing session handling, shutdown
 src/app.ts        wiring: store -> recovery -> sniper -> Telegram; orderly shutdown
 src/main.ts       loads the environment and runs the app; src/index.ts is the entry point
 src/cli.ts        owner CLI entry point; commands in src/cli/
-tests/            unit tests + tests/app (wiring, CLI, end-to-end simulation)
+tests/            unit tests + tests/app (wiring, CLI, end-to-end simulation) + tests/smoke (built bot, real sockets)
 PLAN.md           protocol notes, invariants, roadmap (Russian)
 ```
 

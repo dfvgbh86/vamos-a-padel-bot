@@ -112,6 +112,7 @@ const assemble = (env: Env, overrides: AppOverrides, logger: AppLogger, clock: A
         logger.warn({ jobId: event.job.id, ...describeError(error, secrets) }, 'could not record that a result was delivered');
       }
     },
+    ...(env.telegramApiRoot === undefined ? {} : { apiRoot: env.telegramApiRoot }),
     ...(overrides.telegramTransformer === undefined ? {} : { apiTransformer: overrides.telegramTransformer }),
     onFatalError: (error) => {
       logger.error(
@@ -164,6 +165,7 @@ const assemble = (env: Env, overrides: AppOverrides, logger: AppLogger, clock: A
     if (phase !== 'created') throw new Error(phase === 'started' ? 'The app is already started' : 'The app was stopped and cannot start again');
     phase = 'started';
     try {
+      if (env.telegramApiRoot !== undefined) logger.warn({}, 'telegram: the Bot API root is overridden (tests only)');
       logger.info(
         { allowedUsers: env.allowedUserIds.length, holidays: env.holidays.size, stopFlag: store.isStopped() },
         'starting',

@@ -26,6 +26,11 @@ export interface TelegramBotDeps {
    * labels show a different instant than the one the job is armed for. Defaults to the service's default rule.
    */
   readonly openRule?: OpenRule;
+  /**
+   * Tests only: Bot API root on this machine (http, host exactly 127.0.0.1, localhost or [::1]); anything else is refused
+   * at construction, because the token travels to this address. Absent: api.telegram.org.
+   */
+  readonly apiRoot?: string;
   /** Installed on `bot.api`; tests use it as a fake transport. */
   readonly apiTransformer?: Transformer;
   /** Called when connecting or long polling fails after start() has already returned (conflict, revoked token). */

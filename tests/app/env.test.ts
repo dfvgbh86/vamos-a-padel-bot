@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { createApp } from '../../src/app.js';
 import {
   DEFAULT_BASE_URL,
   DEFAULT_DB_PATH,
@@ -10,8 +11,14 @@ import {
   loadEnv,
   loadSiteEnv,
   loadTelegramTokenEnv,
+  parseTelegramApiRoot,
+  type Env,
   type EnvSource,
 } from '../../src/config/env.js';
+import { createTelegramBot } from '../../src/telegram/bot.js';
+import { SILENT_LOGGER } from '../../src/telegram/types.js';
+import { FakeClock, FakeJobService } from '../telegram/_fakes.js';
+import { TEST_ENV } from './_rig.js';
 
 const ROOT = resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 
@@ -159,7 +166,13 @@ describe('loadEnv: invalid values', () => {
 
   it.each([
     ['plain http', 'http://club.example.test'],
-    ['http on localhost', 'http://localhost:8080'],
+    ['http on a host that only starts like localhost', 'http://localhost.club.example.test:8080'],
+    ['http on a look-alike of 127.0.0.1', 'http://127.0.0.1.club.example.test'],
+    ['http with the loopback address as the user name', 'http://127.0.0.1@club.example.test'],
+    ['credentials on this machine', 'http://user:secret@127.0.0.1:8080'],
+    ['http on 127.0.0.1 with a query string', 'http://127.0.0.1:8080/?a=1'],
+    ['http on another loopback address', 'http://127.0.0.2:8080'],
+    ['an https URL on localhost with a fragment', 'https://localhost:8080/#x'],
     ['not a URL', 'club.example.test'],
     ['another scheme', 'ftp://club.example.test'],
     ['credentials in the URL', 'https://user:secret@club.example.test'],
@@ -191,6 +204,74 @@ describe('loadEnv: invalid values', () => {
     expect(error.invalid).toEqual(['TELEGRAM_ALLOWED_USER_IDS', 'LOG_LEVEL']);
     expect(error.message).toContain('missing: RESERVAPLAY_PASSWORD');
     expect(error.message).toContain('invalid: TELEGRAM_ALLOWED_USER_IDS, LOG_LEVEL');
+  });
+});
+
+describe('loadEnv: the club URL on this machine', () => {
+  it.each([
+    ['http://127.0.0.1:8080', 'http://127.0.0.1:8080'],
+    ['http://localhost:8080/', 'http://localhost:8080'],
+    ['http://[::1]:8080/club//', 'http://[::1]:8080/club'],
+    ['https://localhost:8443', 'https://localhost:8443'],
+  ])('accepts %s', (value, expected) => {
+    expect(load({ RESERVAPLAY_BASE_URL: value }).baseUrl).toBe(expected);
+  });
+});
+
+describe('loadEnv: TELEGRAM_API_ROOT (tests only: the bot token is sent there)', () => {
+  it('is absent by default, also when blank', () => {
+    expect(load()).not.toHaveProperty('telegramApiRoot');
+    expect(load({ TELEGRAM_API_ROOT: '' })).not.toHaveProperty('telegramApiRoot');
+    expect(load({ TELEGRAM_API_ROOT: '   ' })).not.toHaveProperty('telegramApiRoot');
+  });
+
+  it.each([
+    ['http://127.0.0.1:8081', 'http://127.0.0.1:8081'],
+    ['http://127.0.0.1', 'http://127.0.0.1'],
+    ['  http://localhost:9000/  ', 'http://localhost:9000'],
+    ['http://LOCALHOST:9000', 'http://localhost:9000'],
+    ['http://[::1]:9000', 'http://[::1]:9000'],
+    ['http://127.0.0.1:8081/fake///', 'http://127.0.0.1:8081/fake'],
+  ])('accepts %s', (value, expected) => {
+    expect(load({ TELEGRAM_API_ROOT: value }).telegramApiRoot).toBe(expected);
+  });
+
+  it.each([
+    ['the real Telegram', 'https://api.telegram.org'],
+    ['plain http to a foreign host', 'http://api.telegram.org'],
+    ['a foreign host that starts like localhost', 'http://localhost.evil.test:8081'],
+    ['a foreign host that starts like 127.0.0.1', 'http://127.0.0.1.evil.test:8081'],
+    ['a foreign host after a user-info part', 'http://127.0.0.1:8081@evil.test'],
+    ['a foreign host behind a backslash', String.raw`http://evil.test\@127.0.0.1:8081`],
+    ['a foreign host with a tab hidden in the loopback name', 'http://127.0.0.1\t.evil.test:8081'],
+    ['https even on this machine', 'https://127.0.0.1:8081'],
+    ['another loopback address', 'http://127.0.0.2:8081'],
+    ['an address of this machine that is not on the list', 'http://0.0.0.0:8081'],
+    ['an IPv4-mapped IPv6 address', 'http://[::ffff:127.0.0.1]:8081'],
+    ['credentials on this machine', 'http://user:pass@127.0.0.1:8081'],
+    ['a query string', 'http://127.0.0.1:8081/?x=1'],
+    ['a fragment', 'http://127.0.0.1:8081/#x'],
+    ['no scheme', '127.0.0.1:8081'],
+    ['a file URL', 'file://127.0.0.1/tmp'],
+    ['a scheme-relative URL', '//127.0.0.1:8081'],
+    ['garbage', 'not a url'],
+  ])('rejects %s and names only the key', (_label, value) => {
+    const error = failure({ TELEGRAM_API_ROOT: value });
+    expect(error.invalid).toEqual(['TELEGRAM_API_ROOT']);
+    expect(error.missing).toEqual([]);
+    expect(error.message).toContain('invalid: TELEGRAM_API_ROOT');
+    expect(error.message).not.toContain(value.trim());
+  });
+
+  it('is not consulted by the CLI loaders', () => {
+    expect(() => loadSiteEnv({ RESERVAPLAY_USERNAME: 'test-player', RESERVAPLAY_PASSWORD: 'synthetic-password-0001', TELEGRAM_API_ROOT: 'https://api.telegram.org' })).not.toThrow();
+    expect(() => loadTelegramTokenEnv({ TELEGRAM_BOT_TOKEN: '123456:TEST-TOKEN-NOT-REAL', TELEGRAM_API_ROOT: 'https://api.telegram.org' })).not.toThrow();
+  });
+
+  it('parseTelegramApiRoot is the single rule', () => {
+    expect(parseTelegramApiRoot('http://127.0.0.1:1')).toBe('http://127.0.0.1:1');
+    expect(parseTelegramApiRoot('https://api.telegram.org')).toBeNull();
+    expect(parseTelegramApiRoot('')).toBeNull();
   });
 });
 
@@ -255,6 +336,12 @@ describe('.env.example matches the loader', () => {
     expect([...documented().keys()]).toEqual([...ENV_KEYS]);
   });
 
+  it('mentions the tests-only TELEGRAM_API_ROOT in a comment, never as a live line', () => {
+    const lines = readFileSync(join(ROOT, '.env.example'), 'utf8').split(/\r?\n/);
+    expect(lines.some((line) => /^#\s*TELEGRAM_API_ROOT=http:\/\/127\.0\.0\.1:\d+\s*$/.test(line))).toBe(true);
+    expect(documented().has('TELEGRAM_API_ROOT')).toBe(false);
+  });
+
   it('an untouched copy of it fails with exactly the four keys the owner has to fill in', () => {
     const copy: Record<string, string> = Object.fromEntries(documented());
     const error = (() => {
@@ -274,5 +361,52 @@ describe('.env.example matches the loader', () => {
     expect(copy.get('RESERVAPLAY_BASE_URL')).toBe(DEFAULT_BASE_URL);
     expect(copy.get('DB_PATH')).toBe(DEFAULT_DB_PATH);
     expect(copy.get('LOG_LEVEL')).toBe('info');
+  });
+});
+
+describe('the bot token only ever goes to this machine or to Telegram itself (defence in depth below the loader)', () => {
+  const botWith = (apiRoot?: string) =>
+    createTelegramBot({
+      token: VALID['TELEGRAM_BOT_TOKEN'] as string,
+      allowedUserIds: [42],
+      service: new FakeJobService(),
+      clock: new FakeClock(),
+      logger: SILENT_LOGGER,
+      ...(apiRoot === undefined ? {} : { apiRoot }),
+    });
+
+  it.each(['http://127.0.0.1:8081', 'http://localhost:8081', 'http://[::1]:8081'])('createTelegramBot accepts the root %s', (root) => {
+    expect(() => botWith(root)).not.toThrow();
+  });
+
+  it('createTelegramBot works without a root (api.telegram.org)', () => {
+    expect(() => botWith()).not.toThrow();
+  });
+
+  it.each([
+    'https://api.telegram.org',
+    'http://api.telegram.org',
+    'http://localhost.evil.test:8081',
+    'http://127.0.0.2:8081',
+    'https://127.0.0.1:8081',
+    'http://user:pass@127.0.0.1:8081',
+    '',
+    'not a url',
+  ])('createTelegramBot refuses the root "%s" and does not echo it', (root) => {
+    let message = '';
+    try {
+      botWith(root);
+    } catch (error) {
+      message = error instanceof Error ? error.message : String(error);
+    }
+    expect(message).toContain('apiRoot');
+    if (root !== '') expect(message).not.toContain(root);
+  });
+
+  it('createApp refuses a foreign root taken from an Env value as well', async () => {
+    const bad: Env = { ...TEST_ENV, telegramApiRoot: 'https://api.telegram.org' };
+    expect(() => createApp(bad)).toThrow(/apiRoot/);
+    const local = createApp({ ...TEST_ENV, telegramApiRoot: 'http://127.0.0.1:8081' });
+    await local.stop();
   });
 });

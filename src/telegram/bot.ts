@@ -1,4 +1,5 @@
 import { Bot } from 'grammy';
+import { parseTelegramApiRoot } from '../config/env.js';
 import { createCancelFlow } from './cancelFlow.js';
 import { registerCallbacks } from './callbacks.js';
 import { registerCommands } from './commands.js';
@@ -13,6 +14,14 @@ import type { TelegramBotDeps, TelegramBotHandle } from './types.js';
 /** Above the 30 s long-poll, far below grammY's 500 s default: a hung reply must not stall update handling for minutes. */
 const HTTP_TIMEOUT_SECONDS = 60;
 
+/** Throws without echoing the value: the root receives the bot token, so only this machine may be named. */
+const checkedApiRoot = (apiRoot: string | undefined): { readonly apiRoot?: string } => {
+  if (apiRoot === undefined) return {};
+  const root = parseTelegramApiRoot(apiRoot);
+  if (root === null) throw new Error('Telegram apiRoot must be an http URL on 127.0.0.1, localhost or [::1]');
+  return { apiRoot: root };
+};
+
 /**
  * Builds the bot. Throws at construction for an empty or malformed allowlist (an empty list never means
  * "everyone") and for a missing token. Nothing is sent to Telegram until `start()`.
@@ -23,7 +32,7 @@ export const createTelegramBot = (deps: TelegramBotDeps): TelegramBotHandle => {
 
   const { service, clock, logger } = deps;
   const secrets = [deps.token];
-  const bot = new Bot(deps.token, { client: { timeoutSeconds: HTTP_TIMEOUT_SECONDS } });
+  const bot = new Bot(deps.token, { client: { timeoutSeconds: HTTP_TIMEOUT_SECONDS, ...checkedApiRoot(deps.apiRoot) } });
   if (deps.apiTransformer !== undefined) bot.api.config.use(deps.apiTransformer);
 
   registerGuard(bot, { allowed, logger, secrets });

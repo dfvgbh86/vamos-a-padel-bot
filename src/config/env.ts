@@ -24,6 +24,8 @@ export interface Env extends SiteEnv {
   readonly telegramBotToken: string;
   /** Never empty: an empty allowlist is a startup error, not "everyone". */
   readonly allowedUserIds: readonly number[];
+  /** Tests only: a Bot API root on this machine (see parseTelegramApiRoot). Absent: the real api.telegram.org. */
+  readonly telegramApiRoot?: string;
 }
 
 export interface TelegramTokenEnv {
@@ -71,17 +73,38 @@ const parseUserIds = (value: string): readonly number[] | null => {
   return [...ids];
 };
 
-/** Credentials travel to this address: https only, and no credentials, query or fragment in the URL itself. */
-const parseBaseUrl = (value: string): string | null => {
-  let url: URL;
+/** Host names of this machine, as `URL.hostname` spells them: nothing sent there ever leaves the computer. */
+const LOOPBACK_HOSTS: ReadonlySet<string> = new Set(['127.0.0.1', 'localhost', '[::1]']);
+
+const parseUrl = (value: string): URL | null => {
   try {
-    url = new URL(value.trim());
+    return new URL(value.trim());
   } catch {
     return null;
   }
-  if (url.protocol !== 'https:') return null;
-  if (url.username !== '' || url.password !== '' || url.search !== '' || url.hash !== '') return null;
-  return `${url.origin}${url.pathname.replace(/\/+$/, '')}`;
+};
+
+const hasNoExtras = (url: URL): boolean => url.username === '' && url.password === '' && url.search === '' && url.hash === '';
+
+const originAndPath = (url: URL): string => `${url.origin}${url.pathname.replace(/\/+$/, '')}`;
+
+/** Credentials travel to this address: https only (plain http only on this machine), no credentials, query or fragment in the URL. */
+const parseBaseUrl = (value: string): string | null => {
+  const url = parseUrl(value);
+  if (url === null || !hasNoExtras(url)) return null;
+  const onThisMachine = url.protocol === 'http:' && LOOPBACK_HOSTS.has(url.hostname);
+  return url.protocol === 'https:' || onThisMachine ? originAndPath(url) : null;
+};
+
+/**
+ * Where the Telegram client sends the bot token. Only a test double on this machine qualifies: an http URL whose host is
+ * exactly 127.0.0.1, localhost or [::1], so that no configuration can ever point the token at a foreign host.
+ * Returns the normalised root (no trailing slash) or null.
+ */
+export const parseTelegramApiRoot = (value: string): string | null => {
+  const url = parseUrl(value);
+  if (url === null || !hasNoExtras(url)) return null;
+  return url.protocol === 'http:' && LOOPBACK_HOSTS.has(url.hostname) ? originAndPath(url) : null;
 };
 
 const fields = {
@@ -114,6 +137,11 @@ const fields = {
     .refine((value) => !value.includes('\0'))
     .default(DEFAULT_DB_PATH),
   LOG_LEVEL: z.string().trim().toLowerCase().pipe(z.enum(LOG_LEVELS)).default('info'),
+  // Tests only (not part of ENV_KEYS: .env.example mentions it in a comment).
+  TELEGRAM_API_ROOT: z
+    .string()
+    .optional()
+    .transform((value, ctx) => (value === undefined ? undefined : (parseTelegramApiRoot(value) ?? custom(ctx, value)))),
 };
 
 type Parsed = { [K in keyof typeof fields]: z.output<(typeof fields)[K]> };
@@ -127,6 +155,7 @@ const SITE_KEYS = [
   'LOG_LEVEL',
 ] as const;
 const ALL_KEYS = ['TELEGRAM_BOT_TOKEN', 'TELEGRAM_ALLOWED_USER_IDS', ...SITE_KEYS] as const;
+const LOADED_KEYS = [...ALL_KEYS, 'TELEGRAM_API_ROOT'] as const;
 const TOKEN_KEYS = ['TELEGRAM_BOT_TOKEN'] as const;
 
 /** A blank value counts as absent: an untouched `KEY=` line of a copied .env.example means "not set". */
@@ -163,8 +192,14 @@ const toSiteEnv = (parsed: Pick<Parsed, (typeof SITE_KEYS)[number]>): SiteEnv =>
 
 /** Everything the bot needs. Throws EnvError naming the missing or invalid keys. */
 export const loadEnv = (source: EnvSource): Env => {
-  const parsed = read(source, ALL_KEYS);
-  return { ...toSiteEnv(parsed), telegramBotToken: parsed.TELEGRAM_BOT_TOKEN, allowedUserIds: parsed.TELEGRAM_ALLOWED_USER_IDS };
+  const parsed = read(source, LOADED_KEYS);
+  const telegramApiRoot = parsed.TELEGRAM_API_ROOT;
+  return {
+    ...toSiteEnv(parsed),
+    telegramBotToken: parsed.TELEGRAM_BOT_TOKEN,
+    allowedUserIds: parsed.TELEGRAM_ALLOWED_USER_IDS,
+    ...(telegramApiRoot === undefined ? {} : { telegramApiRoot }),
+  };
 };
 
 /** The club account only (CLI checks): no Telegram settings are required. */
@@ -175,5 +210,5 @@ export const loadTelegramTokenEnv = (source: EnvSource): TelegramTokenEnv => ({
   telegramBotToken: read(source, TOKEN_KEYS).TELEGRAM_BOT_TOKEN,
 });
 
-/** Variable names in the order .env.example documents them. */
+/** Variable names in the order .env.example documents them (the tests-only TELEGRAM_API_ROOT is documented in a comment). */
 export const ENV_KEYS: readonly string[] = ALL_KEYS;

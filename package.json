@@ -12,6 +12,7 @@
     "start": "node --env-file=.env --disable-warning=ExperimentalWarning dist/src/index.js",
     "cli": "node --env-file=.env --disable-warning=ExperimentalWarning dist/src/cli.js",
     "test": "vitest run",
+    "test:smoke": "vitest run tests/smoke",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },
